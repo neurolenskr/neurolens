@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>NeuroLens — EEG Dashboard</title>
+<meta name="theme-color" content="#0a0e17">
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiTmV1cm9MZW5zIiwic2hvcnRfbmFtZSI6Ik5ldXJvTGVucyIsInN0YXJ0X3VybCI6Ii4iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjMGEwZTE3IiwidGhlbWVfY29sb3IiOiIjMGEwZTE3In0=">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0e17;--bg2:#111827;--bg3:#1a2235;
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+  --accent:#22d3ee;--accent2:#06b6d4;
+  --alpha:#a78bfa;--beta:#f472b6;--theta:#34d399;--delta:#60a5fa;--gamma:#fbbf24;
+  --danger:#ef4444;--success:#22c55e;
+  --glass:rgba(17,24,39,0.7);
+  --border:rgba(148,163,184,0.1);
+  --glow:0 0 20px rgba(34,211,238,0.15);
+  --radius:12px;
+}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);
+  display:flex;flex-direction:column;
+}
+
+/* Header */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px;background:var(--bg2);border-bottom:1px solid var(--border);
+  flex-shrink:0;z-index:10;
+}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{
+  width:32px;height:32px;border-radius:8px;
+  background:linear-gradient(135deg,var(--accent),#a78bfa);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'JetBrains Mono',monospace;font-weight:600;font-size:14px;color:#0a0e17;
+}
+.logo-text{font-weight:600;font-size:18px;letter-spacing:-0.5px}
+.logo-tag{font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-left:4px}
+.header-right{display:flex;align-items:center;gap:12px}
+.status-pill{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;
+  background:rgba(239,68,68,0.12);color:var(--danger);
+  border:1px solid rgba(239,68,68,0.2);
+  font-family:'JetBrains Mono',monospace;
+  transition:all 0.4s ease;
+}
+.status-pill.connected{
+  background:rgba(34,197,94,0.12);color:var(--success);
+  border-color:rgba(34,197,94,0.2);
+}
+.status-pill.demo{
+  background:rgba(34,211,238,0.12);color:var(--accent);
+  border-color:rgba(34,211,238,0.2);
+}
+.status-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.status-pill.connected .status-dot,.status-pill.demo .status-dot{
+  animation:pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+.btn{
+  padding:8px 16px;border-radius:8px;border:1px solid var(--border);
+  background:var(--bg3);color:var(--text);font-family:'Outfit',sans-serif;
+  font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s;
+  display:flex;align-items:center;gap:6px;
+}
+.btn:hover{background:rgba(34,211,238,0.1);border-color:var(--accent2)}
+.btn-primary{
+  background:linear-gradient(135deg,var(--accent2),var(--accent));
+  color:#0a0e17;border:none;font-weight:600;
+}
+.btn-primary:hover{filter:brightness(1.1)}
+
+/* Main Grid */
+main{
+  flex:1;overflow-y:auto;padding:16px;
+  display:grid;gap:14px;
+  grid-template-columns:1fr 1fr;
+  grid-template-rows:auto 1fr auto;
+  grid-template-areas:
+    "raw raw"
+    "fft bands"
+    "metrics metrics";
+}
+@media(max-width:700px){
+  main{
+    grid-template-columns:1fr;
+    grid-template-rows:auto auto auto auto;
+    grid-template-areas:"raw""fft""bands""metrics";
+  }
+}
+
+.card{
+  background:var(--glass);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px;
+  backdrop-filter:blur(12px);position:relative;overflow:hidden;
+}
+.card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(34,211,238,0.2),transparent);
+}
+.card-title{
+  font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;
+  color:var(--text3);margin-bottom:10px;
+  font-family:'JetBrains Mono',monospace;
+  display:flex;align-items:center;gap:8px;
+}
+.card-title .live-dot{
+  width:5px;height:5px;border-radius:50%;background:var(--accent);
+  animation:pulse 1s ease-in-out infinite;
+}
+
+.raw-area{grid-area:raw}
+.fft-area{grid-area:fft}
+.bands-area{grid-area:bands}
+.metrics-area{grid-area:metrics}
+
+canvas{width:100%;height:100%;display:block}
+.raw-area{height:200px}
+.raw-area canvas{height:160px}
+.fft-area{min-height:220px}
+.fft-area canvas{height:180px}
+
+/* Band Power Bars */
+.band-list{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.band-row{display:flex;align-items:center;gap:10px}
+.band-label{
+  width:54px;font-size:11px;font-weight:600;
+  font-family:'JetBrains Mono',monospace;
+  text-transform:uppercase;letter-spacing:0.5px;
+}
+.band-bar-bg{
+  flex:1;height:22px;background:var(--bg);border-radius:6px;
+  overflow:hidden;position:relative;
+}
+.band-bar{
+  height:100%;border-radius:6px;transition:width 0.3s ease;
+  position:relative;
+}
+.band-bar::after{
+  content:'';position:absolute;top:0;right:0;bottom:0;width:40%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15));
+}
+.band-val{
+  width:44px;text-align:right;font-size:12px;font-weight:500;
+  font-family:'JetBrains Mono',monospace;color:var(--text2);
+}
+.band-delta .band-bar{background:linear-gradient(90deg,var(--delta),#3b82f6)}
+.band-theta .band-bar{background:linear-gradient(90deg,var(--theta),#10b981)}
+.band-alpha .band-bar{background:linear-gradient(90deg,var(--alpha),#8b5cf6)}
+.band-beta .band-bar{background:linear-gradient(90deg,var(--beta),#ec4899)}
+.band-gamma .band-bar{background:linear-gradient(90deg,var(--gamma),#f59e0b)}
+.band-delta .band-label{color:var(--delta)}
+.band-theta .band-label{color:var(--theta)}
+.band-alpha .band-label{color:var(--alpha)}
+.band-beta .band-label{color:var(--beta)}
+.band-gamma .band-label{color:var(--gamma)}
+
+/* Metrics Row */
+.metrics-area{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:12px;padding:0;background:none;border:none;
+}
+.metrics-area::before{display:none}
+.metric-card{
+  background:var(--glass);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px;text-align:center;
+  position:relative;overflow:hidden;
+}
+.metric-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(34,211,238,0.2),transparent);
+}
+.metric-label{
+  font-size:10px;font-weight:600;text-transform:uppercase;
+  letter-spacing:1.5px;color:var(--text3);margin-bottom:6px;
+  font-family:'JetBrains Mono',monospace;
+}
+.metric-value{
+  font-size:28px;font-weight:700;letter-spacing:-1px;
+  font-family:'JetBrains Mono',monospace;
+}
+.metric-unit{font-size:12px;color:var(--text3);font-weight:400;margin-top:2px}
+
+/* Modal */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.6);
+  display:none;align-items:center;justify-content:center;z-index:100;
+  backdrop-filter:blur(4px);
+}
+.modal-overlay.show{display:flex}
+.modal{
+  background:var(--bg2);border:1px solid var(--border);border-radius:16px;
+  padding:28px;max-width:380px;width:90%;text-align:center;
+}
+.modal h3{font-size:18px;font-weight:600;margin-bottom:8px}
+.modal p{font-size:14px;color:var(--text2);margin-bottom:20px;line-height:1.5}
+.modal-btns{display:flex;gap:10px;justify-content:center}
+
+/* Recording indicator */
+.rec-badge{
+  display:none;align-items:center;gap:5px;
+  padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;
+  background:rgba(239,68,68,0.15);color:var(--danger);
+  font-family:'JetBrains Mono',monospace;
+}
+.rec-badge.active{display:flex}
+.rec-badge .rec-dot{
+  width:6px;height:6px;border-radius:50%;background:var(--danger);
+  animation:pulse 0.8s ease-in-out infinite;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">NL</div>
+    <span class="logo-text">NeuroLens</span>
+    <span class="logo-tag">v0.1</span>
+  </div>
+  <div class="header-right">
+    <div class="rec-badge" id="recBadge"><span class="rec-dot"></span>REC</div>
+    <div class="status-pill" id="statusPill"><span class="status-dot"></span><span id="statusText">DISCONNECTED</span></div>
+    <button class="btn" id="btnDemo" onclick="toggleDemo()">Demo</button>
+    <button class="btn btn-primary" id="btnBLE" onclick="connectBLE()">BLE 연결</button>
+  </div>
+</header>
+
+<main>
+  <div class="card raw-area">
+    <div class="card-title"><span class="live-dot"></span>Raw EEG Signal</div>
+    <canvas id="rawCanvas"></canvas>
+  </div>
+  <div class="card fft-area">
+    <div class="card-title"><span class="live-dot"></span>FFT Spectrum</div>
+    <canvas id="fftCanvas"></canvas>
+  </div>
+  <div class="card bands-area">
+    <div class="card-title">Band Power</div>
+    <div class="band-list">
+      <div class="band-row band-delta"><span class="band-label">Delta</span><div class="band-bar-bg"><div class="band-bar" id="barDelta"></div></div><span class="band-val" id="valDelta">0</span></div>
+      <div class="band-row band-theta"><span class="band-label">Theta</span><div class="band-bar-bg"><div class="band-bar" id="barTheta"></div></div><span class="band-val" id="valTheta">0</span></div>
+      <div class="band-row band-alpha"><span class="band-label">Alpha</span><div class="band-bar-bg"><div class="band-bar" id="barAlpha"></div></div><span class="band-val" id="valAlpha">0</span></div>
+      <div class="band-row band-beta"><span class="band-label">Beta</span><div class="band-bar-bg"><div class="band-bar" id="barBeta"></div></div><span class="band-val" id="valBeta">0</span></div>
+      <div class="band-row band-gamma"><span class="band-label">Gamma</span><div class="band-bar-bg"><div class="band-bar" id="barGamma"></div></div><span class="band-val" id="valGamma">0</span></div>
+    </div>
+  </div>
+  <div class="metrics-area">
+    <div class="metric-card">
+      <div class="metric-label">Focus Index</div>
+      <div class="metric-value" id="metFocus" style="color:var(--accent)">—</div>
+      <div class="metric-unit">β / (α + θ)</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Relaxation</div>
+      <div class="metric-value" id="metRelax" style="color:var(--alpha)">—</div>
+      <div class="metric-unit">α / β</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Sample Rate</div>
+      <div class="metric-value" id="metSR" style="color:var(--text2)">—</div>
+      <div class="metric-unit">Hz</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Packets</div>
+      <div class="metric-value" id="metPkt" style="color:var(--text2)">0</div>
+      <div class="metric-unit">received</div>
+    </div>
+  </div>
+</main>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">BLE 연결</h3>
+    <p id="modalMsg">BLE EEG 디바이스를 검색합니다. 디바이스가 켜져 있는지 확인하세요.</p>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal()">취소</button>
+      <button class="btn btn-primary" id="modalAction" onclick="startBLEScan()">검색 시작</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ FFT Implementation (Cooley-Tukey) ============
+class FFT {
+  constructor(size) {
+    this.size = size;
+    this.real = new Float64Array(size);
+    this.imag = new Float64Array(size);
+    this.spectrum = new Float64Array(size / 2);
+    this.reverseTable = new Uint32Array(size);
+    let limit = 1, bit = size >> 1;
+    while (limit < size) {
+      for (let i = 0; i < limit; i++)
+        this.reverseTable[i + limit] = this.reverseTable[i] + bit;
+      limit <<= 1; bit >>= 1;
+    }
+    this.sinTable = new Float64Array(size);
+    this.cosTable = new Float64Array(size);
+    for (let i = 0; i < size; i++) {
+      this.sinTable[i] = Math.sin(-Math.PI / i);
+      this.cosTable[i] = Math.cos(-Math.PI / i);
+    }
+  }
+  forward(buffer) {
+    const n = this.size, { real, imag, reverseTable, spectrum } = this;
+    for (let i = 0; i < n; i++) { real[i] = buffer[reverseTable[i]]; imag[i] = 0; }
+    let halfSize = 1;
+    while (halfSize < n) {
+      const cs = this.cosTable[halfSize], sn = this.sinTable[halfSize];
+      let phaseReal = 1, phaseImag = 0;
+      for (let fftStep = 0; fftStep < halfSize; fftStep++) {
+        let i = fftStep;
+        while (i < n) {
+          const off = i + halfSize;
+          const tr = phaseReal * real[off] - phaseImag * imag[off];
+          const ti = phaseReal * imag[off] + phaseImag * real[off];
+          real[off] = real[i] - tr; imag[off] = imag[i] - ti;
+          real[i] += tr; imag[i] += ti;
+          i += halfSize << 1;
+        }
+        const tmpR = phaseReal * cs - phaseImag * sn;
+        phaseImag = phaseReal * sn + phaseImag * cs;
+        phaseReal = tmpR;
+      }
+      halfSize <<= 1;
+    }
+    for (let i = 0; i < n / 2; i++)
+      spectrum[i] = Math.sqrt(real[i] * real[i] + imag[i] * imag[i]) / n;
+    return spectrum;
+  }
+}
+
+// ============ Hanning Window ============
+function hanningWindow(buf) {
+  const n = buf.length, out = new Float64Array(n);
+  for (let i = 0; i < n; i++)
+    out[i] = buf[i] * 0.5 * (1 - Math.cos(2 * Math.PI * i / (n - 1)));
+  return out;
+}
+
+// ============ State ============
+const SAMPLE_RATE = 250;
+const FFT_SIZE = 256;
+const fft = new FFT(FFT_SIZE);
+
+let rawBuffer = new Float64Array(SAMPLE_RATE * 4); // 4sec ring buffer
+let rawWriteIdx = 0;
+let fftBuffer = new Float64Array(FFT_SIZE);
+let fftWriteIdx = 0;
+let spectrum = new Float64Array(FFT_SIZE / 2);
+let bandPower = { delta: 0, theta: 0, alpha: 0, beta: 0, gamma: 0 };
+let packetCount = 0;
+let sampleCountForSR = 0;
+let lastSRTime = performance.now();
+let currentSR = 0;
+
+let isDemo = false;
+let isBLEConnected = false;
+let bleChar = null;
+let demoInterval = null;
+let demoTime = 0;
+let demoState = 'relaxed'; // relaxed, focused, drowsy
+let demoStateTimer = 0;
+
+// ============ Demo Mode EEG Generator ============
+function generateDemoSample(t) {
+  // Realistic EEG: mix of frequency bands + noise
+  let val = 0;
+  const s = demoState;
+  // Delta (0.5-4 Hz)
+  val += (s === 'drowsy' ? 35 : 12) * Math.sin(2 * Math.PI * 2.5 * t);
+  // Theta (4-8 Hz)
+  val += (s === 'drowsy' ? 25 : s === 'relaxed' ? 15 : 8) * Math.sin(2 * Math.PI * 6 * t);
+  // Alpha (8-13 Hz) - strong in relaxed, suppressed in focused
+  val += (s === 'relaxed' ? 40 : s === 'focused' ? 8 : 20) * Math.sin(2 * Math.PI * 10.5 * t);
+  val += (s === 'relaxed' ? 15 : 5) * Math.sin(2 * Math.PI * 11.2 * t);
+  // Beta (13-30 Hz) - strong in focused
+  val += (s === 'focused' ? 30 : 10) * Math.sin(2 * Math.PI * 18 * t);
+  val += (s === 'focused' ? 18 : 6) * Math.sin(2 * Math.PI * 24 * t);
+  // Gamma (30-50 Hz)
+  val += (s === 'focused' ? 10 : 4) * Math.sin(2 * Math.PI * 40 * t);
+  // Pink noise approximation
+  val += (Math.random() - 0.5) * 15;
+  // 50/60Hz line noise (subtle)
+  val += 3 * Math.sin(2 * Math.PI * 60 * t);
+  return val;
+}
+
+function demoTick() {
+  const dt = 1 / SAMPLE_RATE;
+  // Switch states periodically
+  demoStateTimer++;
+  if (demoStateTimer > SAMPLE_RATE * 8) { // every 8 sec
+    demoStateTimer = 0;
+    const states = ['relaxed', 'focused', 'drowsy'];
+    demoState = states[Math.floor(Math.random() * states.length)];
+  }
+  for (let i = 0; i < 4; i++) { // 4 samples per tick at ~62.5 ticks/s
+    demoTime += dt;
+    const sample = generateDemoSample(demoTime);
+    processSample(sample);
+  }
+}
+
+// ============ Sample Processing ============
+function processSample(val) {
+  // Ring buffer for raw display
+  rawBuffer[rawWriteIdx % rawBuffer.length] = val;
+  rawWriteIdx++;
+  // FFT buffer
+  fftBuffer[fftWriteIdx] = val;
+  fftWriteIdx++;
+  sampleCountForSR++;
+  packetCount++;
+  if (fftWriteIdx >= FFT_SIZE) {
+    fftWriteIdx = 0;
+    const windowed = hanningWindow(fftBuffer);
+    spectrum = fft.forward(windowed);
+    computeBandPower();
+  }
+  // SR calculation
+  const now = performance.now();
+  if (now - lastSRTime >= 1000) {
+    currentSR = Math.round(sampleCountForSR * 1000 / (now - lastSRTime));
+    sampleCountForSR = 0;
+    lastSRTime = now;
+  }
+}
+
+function computeBandPower() {
+  const freqRes = SAMPLE_RATE / FFT_SIZE; // ~0.98 Hz per bin
+  let d = 0, t = 0, a = 0, b = 0, g = 0;
+  for (let i = 0; i < FFT_SIZE / 2; i++) {
+    const freq = i * freqRes;
+    const power = spectrum[i] * spectrum[i];
+    if (freq >= 0.5 && freq < 4) d += power;
+    else if (freq >= 4 && freq < 8) t += power;
+    else if (freq >= 8 && freq < 13) a += power;
+    else if (freq >= 13 && freq < 30) b += power;
+    else if (freq >= 30 && freq < 50) g += power;
+  }
+  // Smooth
+  const sm = 0.3;
+  bandPower.delta = bandPower.delta * (1 - sm) + d * sm;
+  bandPower.theta = bandPower.theta * (1 - sm) + t * sm;
+  bandPower.alpha = bandPower.alpha * (1 - sm) + a * sm;
+  bandPower.beta  = bandPower.beta  * (1 - sm) + b * sm;
+  bandPower.gamma = bandPower.gamma * (1 - sm) + g * sm;
+}
+
+// ============ BLE Connection ============
+async function connectBLE() {
+  document.getElementById('modalOverlay').classList.add('show');
+}
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+async function startBLEScan() {
+  closeModal();
+  if (!navigator.bluetooth) {
+    alert('이 브라우저에서 Web Bluetooth를 지원하지 않습니다. Chrome을 사용해주세요.');
+    return;
+  }
+  try {
+    const device = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: [] // Add your EEG service UUID here
+    });
+    const server = await device.gatt.connect();
+    // For actual EEG device, uncomment and configure:
+    // const service = await server.getPrimaryService('your-eeg-service-uuid');
+    // bleChar = await service.getCharacteristic('eeg-data-uuid');
+    // bleChar.addEventListener('characteristicvaluechanged', onBLEData);
+    // await bleChar.startNotifications();
+    isBLEConnected = true;
+    if (isDemo) toggleDemo();
+    updateStatus();
+    alert('연결됨: ' + device.name + '\n\nGATT Service UUID를 설정하면 EEG 데이터를 수신할 수 있습니다.');
+  } catch (e) {
+    if (e.name !== 'NotFoundError') alert('BLE 연결 실패: ' + e.message);
+  }
+}
+
+function onBLEData(event) {
+  const dv = event.target.value;
+  // Parse based on your device protocol
+  // Example: 24-bit signed int, 1 channel
+  for (let i = 0; i < dv.byteLength; i += 3) {
+    let val = (dv.getUint8(i) << 16) | (dv.getUint8(i + 1) << 8) | dv.getUint8(i + 2);
+    if (val & 0x800000) val |= ~0xFFFFFF; // sign extend
+    const microvolts = (val / 8388607) * 100000; // scale to µV
+    processSample(microvolts);
+  }
+}
+
+// ============ Demo Toggle ============
+function toggleDemo() {
+  if (isDemo) {
+    clearInterval(demoInterval);
+    demoInterval = null;
+    isDemo = false;
+    document.getElementById('btnDemo').textContent = 'Demo';
+  } else {
+    isDemo = true;
+    demoTime = 0;
+    demoStateTimer = 0;
+    document.getElementById('btnDemo').textContent = 'Demo 중지';
+    demoInterval = setInterval(demoTick, 16); // ~62.5 Hz
+  }
+  updateStatus();
+}
+
+function updateStatus() {
+  const pill = document.getElementById('statusPill');
+  const text = document.getElementById('statusText');
+  pill.className = 'status-pill';
+  if (isBLEConnected) { pill.classList.add('connected'); text.textContent = 'BLE CONNECTED'; }
+  else if (isDemo) { pill.classList.add('demo'); text.textContent = 'DEMO MODE'; }
+  else { text.textContent = 'DISCONNECTED'; }
+}
+
+// ============ Canvas Rendering ============
+const rawCanvas = document.getElementById('rawCanvas');
+const fftCanvas = document.getElementById('fftCanvas');
+const rawCtx = rawCanvas.getContext('2d');
+const fftCtx = fftCanvas.getContext('2d');
+
+function resizeCanvases() {
+  const dpr = window.devicePixelRatio || 1;
+  [rawCanvas, fftCanvas].forEach(c => {
+    const rect = c.getBoundingClientRect();
+    c.width = rect.width * dpr;
+    c.height = rect.height * dpr;
+    c.getContext('2d').scale(dpr, dpr);
+  });
+}
+window.addEventListener('resize', resizeCanvases);
+setTimeout(resizeCanvases, 100);
+
+function drawRaw() {
+  const w = rawCanvas.getBoundingClientRect().width;
+  const h = rawCanvas.getBoundingClientRect().height;
+  rawCtx.clearRect(0, 0, w, h);
+
+  // Grid lines
+  rawCtx.strokeStyle = 'rgba(148,163,184,0.06)';
+  rawCtx.lineWidth = 0.5;
+  for (let y = 0; y < h; y += h / 6) {
+    rawCtx.beginPath(); rawCtx.moveTo(0, y); rawCtx.lineTo(w, y); rawCtx.stroke();
+  }
+
+  // Zero line
+  rawCtx.strokeStyle = 'rgba(148,163,184,0.15)';
+  rawCtx.beginPath(); rawCtx.moveTo(0, h / 2); rawCtx.lineTo(w, h / 2); rawCtx.stroke();
+
+  if (rawWriteIdx < 2) return;
+
+  const totalSamples = Math.min(rawWriteIdx, rawBuffer.length);
+  const startIdx = rawWriteIdx - totalSamples;
+  const samplesOnScreen = Math.min(totalSamples, SAMPLE_RATE * 3); // 3 sec window
+
+  // Glow layer
+  rawCtx.save();
+  rawCtx.strokeStyle = 'rgba(34,211,238,0.15)';
+  rawCtx.lineWidth = 4;
+  rawCtx.filter = 'blur(3px)';
+  rawCtx.beginPath();
+  for (let i = 0; i < samplesOnScreen; i++) {
+    const x = (i / samplesOnScreen) * w;
+    const idx = (rawWriteIdx - samplesOnScreen + i) % rawBuffer.length;
+    const val = rawBuffer[idx < 0 ? idx + rawBuffer.length : idx];
+    const y = h / 2 - (val / 120) * (h / 2);
+    if (i === 0) rawCtx.moveTo(x, y); else rawCtx.lineTo(x, y);
+  }
+  rawCtx.stroke();
+  rawCtx.restore();
+
+  // Main line
+  rawCtx.strokeStyle = 'rgba(34,211,238,0.9)';
+  rawCtx.lineWidth = 1.5;
+  rawCtx.lineJoin = 'round';
+  rawCtx.beginPath();
+  for (let i = 0; i < samplesOnScreen; i++) {
+    const x = (i / samplesOnScreen) * w;
+    const idx = (rawWriteIdx - samplesOnScreen + i) % rawBuffer.length;
+    const val = rawBuffer[idx < 0 ? idx + rawBuffer.length : idx];
+    const y = h / 2 - (val / 120) * (h / 2);
+    if (i === 0) rawCtx.moveTo(x, y); else rawCtx.lineTo(x, y);
+  }
+  rawCtx.stroke();
+}
+
+function drawFFT() {
+  const w = fftCanvas.getBoundingClientRect().width;
+  const h = fftCanvas.getBoundingClientRect().height;
+  fftCtx.clearRect(0, 0, w, h);
+
+  // Grid
+  fftCtx.strokeStyle = 'rgba(148,163,184,0.06)';
+  fftCtx.lineWidth = 0.5;
+  for (let y = 0; y < h; y += h / 5) {
+    fftCtx.beginPath(); fftCtx.moveTo(0, y); fftCtx.lineTo(w, y); fftCtx.stroke();
+  }
+  // Freq labels
+  fftCtx.fillStyle = 'rgba(148,163,184,0.35)';
+  fftCtx.font = '10px JetBrains Mono';
+  const maxFreq = 50; // Show up to 50Hz
+  const maxBin = Math.floor(maxFreq / (SAMPLE_RATE / FFT_SIZE));
+  for (let f = 0; f <= 50; f += 10) {
+    const x = (f / maxFreq) * w;
+    fftCtx.fillText(f + 'Hz', x + 2, h - 4);
+  }
+
+  // Band regions
+  const bandColors = [
+    { start: 0.5, end: 4, color: 'rgba(96,165,250,0.06)' },
+    { start: 4, end: 8, color: 'rgba(52,211,153,0.06)' },
+    { start: 8, end: 13, color: 'rgba(167,139,250,0.06)' },
+    { start: 13, end: 30, color: 'rgba(244,114,182,0.06)' },
+    { start: 30, end: 50, color: 'rgba(251,191,36,0.06)' },
+  ];
+  bandColors.forEach(b => {
+    const x1 = (b.start / maxFreq) * w, x2 = (b.end / maxFreq) * w;
+    fftCtx.fillStyle = b.color;
+    fftCtx.fillRect(x1, 0, x2 - x1, h);
+  });
+
+  if (!spectrum || spectrum.length < 2) return;
+
+  // Find max for scaling
+  let maxVal = 0;
+  for (let i = 0; i < maxBin && i < spectrum.length; i++)
+    if (spectrum[i] > maxVal) maxVal = spectrum[i];
+  if (maxVal < 0.1) maxVal = 0.1;
+
+  // Gradient fill
+  const grad = fftCtx.createLinearGradient(0, 0, w, 0);
+  grad.addColorStop(0, 'rgba(96,165,250,0.5)');
+  grad.addColorStop(0.15, 'rgba(52,211,153,0.5)');
+  grad.addColorStop(0.25, 'rgba(167,139,250,0.5)');
+  grad.addColorStop(0.55, 'rgba(244,114,182,0.4)');
+  grad.addColorStop(1, 'rgba(251,191,36,0.3)');
+
+  fftCtx.beginPath();
+  fftCtx.moveTo(0, h);
+  for (let i = 0; i < maxBin && i < spectrum.length; i++) {
+    const x = (i / maxBin) * w;
+    const y = h - (spectrum[i] / maxVal) * (h * 0.85);
+    fftCtx.lineTo(x, y);
+  }
+  fftCtx.lineTo(w, h);
+  fftCtx.closePath();
+  fftCtx.fillStyle = grad;
+  fftCtx.fill();
+
+  // Line on top
+  fftCtx.beginPath();
+  for (let i = 0; i < maxBin && i < spectrum.length; i++) {
+    const x = (i / maxBin) * w;
+    const y = h - (spectrum[i] / maxVal) * (h * 0.85);
+    if (i === 0) fftCtx.moveTo(x, y); else fftCtx.lineTo(x, y);
+  }
+  fftCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+  fftCtx.lineWidth = 1;
+  fftCtx.stroke();
+}
+
+function updateBands() {
+  const total = bandPower.delta + bandPower.theta + bandPower.alpha + bandPower.beta + bandPower.gamma;
+  if (total < 0.001) return;
+  const bands = ['delta', 'theta', 'alpha', 'beta', 'gamma'];
+  bands.forEach(b => {
+    const pct = (bandPower[b] / total) * 100;
+    const bar = document.getElementById('bar' + b.charAt(0).toUpperCase() + b.slice(1));
+    const val = document.getElementById('val' + b.charAt(0).toUpperCase() + b.slice(1));
+    bar.style.width = Math.min(pct, 100) + '%';
+    val.textContent = pct.toFixed(1);
+  });
+}
+
+function updateMetrics() {
+  const { alpha, beta, theta } = bandPower;
+  const focus = (alpha + theta) > 0.001 ? beta / (alpha + theta) : 0;
+  const relax = beta > 0.001 ? alpha / beta : 0;
+
+  document.getElementById('metFocus').textContent = focus > 0 ? focus.toFixed(2) : '—';
+  document.getElementById('metRelax').textContent = relax > 0 ? relax.toFixed(2) : '—';
+  document.getElementById('metSR').textContent = currentSR > 0 ? currentSR : '—';
+  document.getElementById('metPkt').textContent = packetCount > 9999 ? (packetCount / 1000).toFixed(1) + 'k' : packetCount;
+}
+
+// ============ Render Loop ============
+function render() {
+  drawRaw();
+  drawFFT();
+  updateBands();
+  updateMetrics();
+  requestAnimationFrame(render);
+}
+requestAnimationFrame(render);
+
+// ============ Service Worker for PWA offline ============
+if ('serviceWorker' in navigator) {
+  const swCode = `
+    const CACHE = 'neurolens-v1';
+    self.addEventListener('install', e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(['/'])));
+      self.skipWaiting();
+    });
+    self.addEventListener('fetch', e => {
+      e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+    });
+  `;
+  const blob = new Blob([swCode], { type: 'application/javascript' });
+  // Service worker registration would work on actual server deployment
+  // navigator.serviceWorker.register(URL.createObjectURL(blob));
+}
+</script>
+</body>
+</html>
