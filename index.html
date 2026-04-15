@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>NeuroLens — EEG Dashboard</title>
 <meta name="theme-color" content="#0a0e17">
-<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiTmV1cm9MZW5zIiwic2hvcnRfbmFtZSI6Ik5ldXJvTGVucyIsInN0YXJ0X3VybCI6Ii4iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjMGEwZTE3IiwidGhlbWVfY29sb3IiOiIjMGEwZTE3In0=">
+<link rel="manifest" href="manifest.json">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap');
 
@@ -710,7 +710,7 @@ requestAnimationFrame(render);
 
 // ============ Service Worker for PWA offline ============
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/neurolens/sw.js')
+  navigator.serviceWorker.register('./sw.js')
     .then(reg => console.log('SW registered:', reg.scope))
     .catch(err => console.log('SW registration failed:', err));
 }
