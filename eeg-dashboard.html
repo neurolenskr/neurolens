@@ -710,19 +710,9 @@ requestAnimationFrame(render);
 
 // ============ Service Worker for PWA offline ============
 if ('serviceWorker' in navigator) {
-  const swCode = `
-    const CACHE = 'neurolens-v1';
-    self.addEventListener('install', e => {
-      e.waitUntil(caches.open(CACHE).then(c => c.addAll(['/'])));
-      self.skipWaiting();
-    });
-    self.addEventListener('fetch', e => {
-      e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
-    });
-  `;
-  const blob = new Blob([swCode], { type: 'application/javascript' });
-  // Service worker registration would work on actual server deployment
-  // navigator.serviceWorker.register(URL.createObjectURL(blob));
+  navigator.serviceWorker.register('/neurolens/sw.js')
+    .then(reg => console.log('SW registered:', reg.scope))
+    .catch(err => console.log('SW registration failed:', err));
 }
 </script>
 </body>
